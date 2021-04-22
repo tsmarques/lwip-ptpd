@@ -1,7 +1,8 @@
 /* arith.c */
 #include <lwip/apps/ptpd.h>
 
-void scaledNanosecondsToInternalTime(const int64_t *scaledNanoseconds, TimeInternal *internal)
+void
+ptp_time_scaled_nanoseconds_to_internal(const int64_t *scaledNanoseconds, time_interval_t*internal)
 {
   int sign;
   int64_t nanoseconds = *scaledNanoseconds;
@@ -23,7 +24,8 @@ void scaledNanosecondsToInternalTime(const int64_t *scaledNanoseconds, TimeInter
   internal->nanoseconds = sign * (nanoseconds % 1000000000);
 }
 
-void fromInternalTime(const TimeInternal *internal, Timestamp *external)
+void
+ptp_time_from_internal(const time_interval_t*internal, timestamp_t*external)
 {
   /* fromInternalTime is only used to convert time given by the system to a timestamp
    * As a consequence, no negative value can normally be found in (internal)
@@ -36,19 +38,20 @@ void fromInternalTime(const TimeInternal *internal, Timestamp *external)
   }
   else
   {
-    external->secondsField.lsb = internal->seconds;
-    external->nanosecondsField = internal->nanoseconds;
-    external->secondsField.msb = 0;
+    external->seconds_field.lsb = internal->seconds;
+    external->nanoseconds_field = internal->nanoseconds;
+    external->seconds_field.msb = 0;
   }
 }
 
-void toInternalTime(TimeInternal *internal, const Timestamp *external)
+void
+ptp_to_internal_time(time_interval_t*internal, const timestamp_t*external)
 {
   /* Program will not run after 2038... */
-  if (external->secondsField.lsb < INT_MAX)
+  if (external->seconds_field.lsb < INT_MAX)
   {
-    internal->seconds = external->secondsField.lsb;
-    internal->nanoseconds = external->nanosecondsField;
+    internal->seconds = external->seconds_field.lsb;
+    internal->nanoseconds = external->nanoseconds_field;
   }
   else
   {
@@ -57,7 +60,8 @@ void toInternalTime(TimeInternal *internal, const Timestamp *external)
   }
 }
 
-void normalizeTime(TimeInternal *r)
+void
+ptp_time_normalize(time_interval_t*r)
 {
   r->seconds += r->nanoseconds / 1000000000;
   r->nanoseconds -= r->nanoseconds / 1000000000 * 1000000000;
@@ -74,32 +78,36 @@ void normalizeTime(TimeInternal *r)
   }
 }
 
-void addTime(TimeInternal *r, const TimeInternal *x, const TimeInternal *y)
+void
+ptp_time_add(time_interval_t*r, const time_interval_t*x, const time_interval_t*y)
 {
   r->seconds = x->seconds + y->seconds;
   r->nanoseconds = x->nanoseconds + y->nanoseconds;
 
-  normalizeTime(r);
+  ptp_time_normalize(r);
 }
 
-void subTime(TimeInternal *r, const TimeInternal *x, const TimeInternal *y)
+void
+ptp_sub_time(time_interval_t*r, const time_interval_t*x, const time_interval_t*y)
 {
   r->seconds = x->seconds - y->seconds;
   r->nanoseconds = x->nanoseconds - y->nanoseconds;
 
-  normalizeTime(r);
+  ptp_time_normalize(r);
 }
 
-void div2Time(TimeInternal *r)
+void
+ptp_time_halve(time_interval_t*r)
 {
   r->nanoseconds += r->seconds % 2 * 1000000000;
   r->seconds /= 2;
   r->nanoseconds /= 2;
 
-  normalizeTime(r);
+  ptp_time_normalize(r);
 }
 
-int32_t floorLog2(uint32_t n)
+int32_t
+ptp_floor_log2(uint32_t n)
 {
   int pos = 0;
 

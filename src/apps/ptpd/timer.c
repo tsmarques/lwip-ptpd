@@ -2,6 +2,7 @@
 
 #include <lwip/apps/ptpd.h>
 
+// @todo move to chibios
 typedef struct sys_timer
 {
   virtual_timer_t sys_timer;
@@ -12,11 +13,11 @@ typedef struct sys_timer
 
 
 /* An array to hold the various system timer handles. */
-static sys_timer_t ptpdTimers[TIMER_ARRAY_SIZE];
-static bool ptpdTimersExpired[TIMER_ARRAY_SIZE];
+static sys_timer_t ptp_timers[TIMER_ARRAY_SIZE];
+static bool ptp_expired_timers[TIMER_ARRAY_SIZE];
 
 static void
-timerCallback(void *arg)
+timer_callback(void *arg)
 {
   DBGVV("TIMER!!\r\n");
   int index = (int) arg;
@@ -25,7 +26,7 @@ timerCallback(void *arg)
   if (index < TIMER_ARRAY_SIZE)
   {
     /* Mark the indicated timer as expired. */
-    ptpdTimersExpired[index] = true;
+    ptp_expired_timers[index] = true;
 
     chSysLockFromISR();
 
@@ -33,21 +34,20 @@ timerCallback(void *arg)
     ptpd_alert();
 
     // restart timer
-    chVTSetI(&ptpdTimers[index].sys_timer,
-             TIME_MS2I(ptpdTimers[index].millisec),
-             ptpdTimers[index].sys_callback,
-             ptpdTimers[index].argument);
+    chVTSetI(&ptp_timers[index].sys_timer,
+             TIME_MS2I(ptp_timers[index].millisec), ptp_timers[index].sys_callback,
+             ptp_timers[index].argument);
 
     chSysUnlockFromISR();
   }
 }
 
 void
-initTimer(void)
+ptp_init_timer(void)
 {
   int32_t i;
 
-  DBG("initTimer\n");
+  DBG("ptp_init_timer\n");
 
   /* Create the various timers used in the system. */
   for (i = 0; i < TIMER_ARRAY_SIZE; i++)
@@ -56,56 +56,55 @@ initTimer(void)
     // Initialize the timer.
 
     //chVTObjectInit(&ptpdTimers[i].sys_timer);
-    ptpdTimers[i].sys_callback = &timerCallback;
-    ptpdTimers[i].argument = (void *) i;
-    ptpdTimersExpired[i] = false;
+    ptp_timers[i].sys_callback = &timer_callback;
+    ptp_timers[i].argument = (void *) i;
+    ptp_expired_timers[i] = false;
   }
 }
 
 void
-timerStop(int32_t index)
+ptp_timer_stop(int32_t index)
 {
   DBGV("timer stop?\r\n");
   /* Sanity check the index. */
   if (index >= TIMER_ARRAY_SIZE) return;
 
   // Cancel the timer and reset the expired flag.
-  DBGV("timerStop: stop timer %d\n", index);
-  chVTReset(&ptpdTimers[index].sys_timer);
-  ptpdTimersExpired[index] = false;
+  DBGV("ptp_timer_stop: stop timer %d\n", index);
+  chVTReset(&ptp_timers[index].sys_timer);
+  ptp_expired_timers[index] = false;
 }
 
 void
-timerStart(int32_t index, uint32_t interval_ms)
+ptp_timer_start(int32_t index, uint32_t interval_ms)
 {
   /* Sanity check the index. */
   if (index >= TIMER_ARRAY_SIZE)
     return;
 
   // Set the timer duration and start the timer.
-  DBGV("timerStart: set timer %d to %d\n", index, interval_ms);
+  DBGV("ptp_timer_start: set timer %d to %d\n", index, interval_ms);
 
-  ptpdTimersExpired[index] = false;
-  ptpdTimers[index].millisec = interval_ms;
-  chVTSet(&ptpdTimers[index].sys_timer,
-          TIME_MS2I(interval_ms),
-          ptpdTimers[index].sys_callback,
-          ptpdTimers[index].argument);
+  ptp_expired_timers[index] = false;
+  ptp_timers[index].millisec = interval_ms;
+  chVTSet(&ptp_timers[index].sys_timer,
+          TIME_MS2I(interval_ms), ptp_timers[index].sys_callback,
+          ptp_timers[index].argument);
 }
 
 bool
-timerExpired(int32_t index)
+ptp_timer_expired(int32_t index)
 {
   /* Sanity check the index. */
   if (index >= TIMER_ARRAY_SIZE)
     return false;
 
   /* Determine if the timer expired. */
-  if (!ptpdTimersExpired[index])
+  if (!ptp_expired_timers[index])
     return false;
 
-  DBGV("timerExpired: timer %d expired\n", index);
-  ptpdTimersExpired[index] = false;
+  DBGV("ptp_timer_expired: timer %d expired\n", index);
+  ptp_expired_timers[index] = false;
 
   return true;
 }

@@ -137,28 +137,28 @@ static inline int32_t flip32(x)
  *-Pack and unpack PTP messages */
 /**\{*/
 
-void msgUnpackHeader(const octet_t*, MsgHeader*);
-void msgUnpackAnnounce(const octet_t*, MsgAnnounce*);
-void msgUnpackSync(const octet_t*, MsgSync*);
-void msgUnpackFollowUp(const octet_t*, MsgFollowUp*);
-void msgUnpackDelayReq(const octet_t*, MsgDelayReq*);
-void msgUnpackDelayResp(const octet_t*, MsgDelayResp*);
-void msgUnpackPDelayReq(const octet_t*, MsgPDelayReq*);
-void msgUnpackPDelayResp(const octet_t*, MsgPDelayResp*);
-void msgUnpackPDelayRespFollowUp(const octet_t*, MsgPDelayRespFollowUp*);
-void msgUnpackManagement(const octet_t*, MsgManagement*);
-void msgUnpackManagementPayload(const octet_t *buf, MsgManagement *manage);
-void msgPackHeader(const PtpClock*, octet_t*);
-void msgPackAnnounce(const PtpClock*, octet_t*);
-void msgPackSync(const PtpClock*, octet_t*, const Timestamp*);
-void msgPackFollowUp(const PtpClock*, octet_t*, const Timestamp*);
-void msgPackDelayReq(const PtpClock*, octet_t*, const Timestamp*);
-void msgPackDelayResp(const PtpClock*, octet_t*, const MsgHeader*, const Timestamp*);
-void msgPackPDelayReq(const PtpClock*, octet_t*, const Timestamp*);
-void msgPackPDelayResp(octet_t*, const MsgHeader*, const Timestamp*);
-void msgPackPDelayRespFollowUp(octet_t*, const MsgHeader*, const Timestamp*);
-int16_t msgPackManagement(const PtpClock*,  octet_t*, const MsgManagement*);
-int16_t msgPackManagementResponse(const PtpClock*,  octet_t*, MsgHeader*, const MsgManagement*);
+void msg_unpack_header(const octet_t* buf, msg_header_t* header);
+void msg_unpack_announce(const octet_t* buf, msg_announce_t* announce);
+void msg_unpack_sync(const octet_t* buf, msg_sync_t* sync);
+void msg_unpack_followup(const octet_t* buf, msg_followup_t* follow);
+void msg_unpack_delay_req(const octet_t* buf, msg_delay_req_t* delayreq);
+void msg_unpack_delay_resp(const octet_t* buf, msg_delay_resp_t* resp);
+void msg_unpack_pdelay_req(const octet_t* buf, msg_pdelay_req_t* pdelayreq);
+void msg_unpack_pdelay_resp(const octet_t* buf, msg_pdelay_resp_t* presp);
+void msg_unpack_pdelay_resp_followup(const octet_t* buf, msg_pdelay_resp_followup_t* prespfollow);
+void msgUnpackManagement(const octet_t*, msg_management*);
+void msgUnpackManagementPayload(const octet_t *buf, msg_management*manage);
+void msg_pack_header(const ptp_clock_t* ptpClock, octet_t* buf);
+void msg_pack_announce(const ptp_clock_t* ptpClock, octet_t* buf);
+void msg_pack_sync(const ptp_clock_t* ptpClock, octet_t* buf, const timestamp_t* originTimestamp);
+void msg_pack_followup(const ptp_clock_t* ptpClock, octet_t* buf, const timestamp_t* preciseOriginTimestamp);
+void msg_pack_delay_req(const ptp_clock_t* ptpClock, octet_t* buf, const timestamp_t* originTimestamp);
+void msg_pack_relay_resp(const ptp_clock_t* ptpClock, octet_t* buf, const msg_header_t* header, const timestamp_t* receiveTimestamp);
+void msg_pack_pdelay_req(const ptp_clock_t* ptpClock, octet_t* buf, const timestamp_t* originTimestamp);
+void msg_pack_pdelay_resp(octet_t* buf, const msg_header_t* header, const timestamp_t* requestReceiptTimestamp);
+void msg_pack_pdelay_resp_followup(octet_t* buf, const msg_header_t* header, const timestamp_t* responseOriginTimestamp);
+int16_t msgPackManagement(const ptp_clock_t*,  octet_t*, const msg_management*);
+int16_t msgPackManagementResponse(const ptp_clock_t*,  octet_t*, msg_header_t*, const msg_management*);
 /** \}*/
 
 
@@ -166,11 +166,11 @@ int16_t msgPackManagementResponse(const PtpClock*,  octet_t*, MsgHeader*, const 
  * -Clock servo */
 /**\{*/
 
-void initClock(PtpClock*);
-void updatePeerDelay(PtpClock*, const TimeInternal*, bool);
-void updateDelay(PtpClock*, const TimeInternal*, const TimeInternal*, const TimeInternal*);
-void updateOffset(PtpClock *, const TimeInternal*, const TimeInternal*, const TimeInternal*);
-void updateClock(PtpClock*);
+void servo_init_clock(ptp_clock_t* clock);
+void servo_update_peer_delay(ptp_clock_t* clock, const time_interval_t* correction_field, bool is_two_step);
+void servo_update_delay(ptp_clock_t* clock, const time_interval_t* delay_event_egress_timestamp, const time_interval_t* recv_timestamp, const time_interval_t* correction_field);
+void servo_update_offset(ptp_clock_t* clock, const time_interval_t* sync_event_ingress_timestamp, const time_interval_t* precise_origin_timestamp, const time_interval_t* correction_field);
+void servo_update_clock(ptp_clock_t* clock);
 /** \}*/
 
 /** \name startup.c (Linux API dependent)
@@ -179,29 +179,29 @@ void updateClock(PtpClock*);
 
 void ptpd_opts_init(void);
 
-int16_t ptpdStartup(PtpClock*, ptpd_opts*, ForeignMasterRecord*);
-void ptpdShutdown(PtpClock *);
+int16_t ptp_startup(ptp_clock_t* clock, ptpd_opts* opts, foreign_master_record_t* foreign);
+void ptpdShutdown(ptp_clock_t*);
 /** \}*/
 
 /** \name sys.c (Linux API dependent)
  * -Manage timing system API */
 /**\{*/
-void displayStats(const PtpClock *ptpClock);
-bool  nanoSleep(const TimeInternal*);
-void bsp_get_time(TimeInternal* time);
-void bsp_set_time(const TimeInternal* time);
-void ptpd_update_time(const TimeInternal* time);
+void displayStats(const ptp_clock_t*ptpClock);
+bool  nanoSleep(const time_interval_t*);
+void bsp_get_time(time_interval_t* time);
+void bsp_set_time(const time_interval_t* time);
+void ptpd_update_time(const time_interval_t* time);
 bool ptpd_adj_frequency(int32_t adj);
-uint32_t bsp_get_rand(uint32_t randMax);
+uint32_t bsp_get_rand(uint32_t rand_max);
 /** \}*/
 
 /** \name timer.c (Linux API dependent)
  * -Handle with timers */
 /**\{*/
-void initTimer(void);
-void timerStop(int32_t);
-void timerStart(int32_t,  uint32_t);
-bool timerExpired(int32_t);
+void ptp_init_timer(void);
+void ptp_timer_stop(int32_t index);
+void ptp_timer_start(int32_t index,  uint32_t interval_ms);
+bool ptp_timer_expired(int32_t index);
 /** \}*/
 
 /** \name arith.c
@@ -212,37 +212,37 @@ bool timerExpired(int32_t);
 /**
  * \brief Convert scaled nanoseconds into TimeInternal structure
  */
-void scaledNanosecondsToInternalTime(const int64_t*, TimeInternal*);
+void ptp_time_scaled_nanoseconds_to_internal(const int64_t* scaledNanoseconds, time_interval_t* internal);
 /**
  * \brief Convert TimeInternal into Timestamp structure (defined by the spec)
  */
-void fromInternalTime(const TimeInternal*, Timestamp*);
+void ptp_time_from_internal(const time_interval_t* internal, timestamp_t* external);
 
 /**
  * \brief Convert Timestamp to TimeInternal structure (defined by the spec)
  */
-void toInternalTime(TimeInternal*, const Timestamp*);
+void ptp_to_internal_time(time_interval_t* internal, const timestamp_t* external);
 
 /**
  * \brief Add two TimeInternal structure and normalize
  */
-void addTime(TimeInternal*, const TimeInternal*, const TimeInternal*);
+void ptp_time_add(time_interval_t* r, const time_interval_t* x, const time_interval_t* y);
 
 /**
  * \brief Substract two TimeInternal structure and normalize
  */
-void subTime(TimeInternal*, const TimeInternal*, const TimeInternal*);
+void ptp_sub_time(time_interval_t* r, const time_interval_t* x, const time_interval_t* y);
 
 /**
  * \brief Divide the TimeInternal by 2 and normalize
  */
-void div2Time(TimeInternal*);
+void ptp_time_halve(time_interval_t* r);
 
 /**
  * \brief Returns the floor form of binary logarithm for a 32 bit integer.
  * -1 is returned if ''n'' is 0.
  */
-int32_t floorLog2(uint32_t);
+int32_t ptp_floor_log2(uint32_tn);
 
 /**
  * \brief return maximum of two numbers
@@ -270,37 +270,37 @@ static __INLINE int32_t min(int32_t a, int32_t b)
  * \brief Compare data set of foreign masters and local data set
  * \return The recommended state for the port
  */
-uint8_t bmc(PtpClock*);
+uint8_t bmc(ptp_clock_t*);
 
 /**
  * \brief When recommended state is Master, copy local data into parent and grandmaster dataset
  */
-void m1(PtpClock*);
+void bmc_m1(ptp_clock_t* clock);
 
 /**
  * \brief When recommended state is Passive
  */
-void p1(PtpClock*);
+void bmc_p1(ptp_clock_t* clock);
 
 /**
  * \brief When recommended state is Slave, copy dataset of master into parent and grandmaster dataset
  */
-void s1(PtpClock*, const MsgHeader*, const MsgAnnounce*);
+void bmc_s1(ptp_clock_t* clock, const msg_header_t* header, const msg_announce_t* announce);
 
 /**
  * \brief Initialize datas
  */
-void initData(PtpClock*);
+void bcm_init_data(ptp_clock_t* clock);
 
 /**
  * \brief Compare two port identities
  */
-bool  isSamePortIdentity(const PortIdentity*, const PortIdentity*);
+bool bmc_is_same_poort_identity(const port_identity_t* A, const port_identity_t* B);
 
 /**
  * \brief Add foreign record defined by announce message
  */
-void addForeign(PtpClock*, const MsgHeader*, const MsgAnnounce*);
+void bmc_add_foreign(ptp_clock_t* clock, const msg_header_t* header, const msg_announce_t* announce);
 
 
 /** \}*/
@@ -317,12 +317,12 @@ void addForeign(PtpClock*, const MsgHeader*, const MsgAnnounce*);
 /**
  * \brief Run PTP stack in current state
  */
-void doState(PtpClock*);
+void ptp_do_state(ptp_clock_t*);
 
 /**
  * \brief Change state of PTP stack
  */
-void toState(PtpClock*, uint8_t);
+void ptp_to_state(ptp_clock_t* clock, uint8_t state);
 /** \}*/
 
 void ptpd_opts_init(void);
@@ -330,32 +330,32 @@ void ptpd_opts_init(void);
 // Send an alert to the PTP daemon thread.
 void ptpd_alert(void);
 
-bool ptpd_net_init(NetPath* netPath, PtpClock* ptpClock);
+bool ptpd_net_init(net_path_t* net_path, ptp_clock_t* clock);
 
-bool ptpd_shutdown(NetPath* netPath);
+bool ptpd_shutdown(net_path_t* net_path);
 
-int32_t ptpd_net_select(NetPath* netPath, const TimeInternal* timeout);
+int32_t ptpd_net_select(net_path_t* net_path, const time_interval_t* timeout);
 
-void ptpd_empty_event_queue(NetPath* netPath);
+void ptpd_empty_event_queue(net_path_t* net_path);
 
-ssize_t ptpd_recv_event(NetPath* netPath, octet_t* buf, TimeInternal* time);
+ssize_t ptpd_recv_event(net_path_t* net_path, octet_t* buf, time_interval_t* time);
 
-ssize_t ptpd_recv_general(NetPath* netPath, octet_t* buf, TimeInternal* time);
+ssize_t ptpd_recv_general(net_path_t* net_path, octet_t* buf, time_interval_t* time);
 
-ssize_t ptpd_send_event(NetPath* netPath, const octet_t* buf, int16_t length, TimeInternal* time);
+ssize_t ptpd_send_event(net_path_t* net_path, const octet_t* buf, int16_t length, time_interval_t* time);
 
-ssize_t ptpd_send_general(NetPath* netPath, const octet_t* buf, int16_t length);
+ssize_t ptpd_send_general(net_path_t* netPath, const octet_t* buf, int16_t length);
 
-ssize_t ptpd_peer_send_general(NetPath* netPath, const octet_t* buf, int16_t length);
+ssize_t ptpd_peer_send_general(net_path_t* netPath, const octet_t* buf, int16_t length);
 
-ssize_t ptpd_peer_send_event(NetPath* netPath, const octet_t* buf, int16_t length, TimeInternal* time);
+ssize_t ptpd_peer_send_event(net_path_t* netPath, const octet_t* buf, int16_t length, time_interval_t* time);
 
-void bsp_get_time(TimeInternal* time);
+void bsp_get_time(time_interval_t* time);
 
-void bsp_set_time(const TimeInternal* time);
+void bsp_set_time(const time_interval_t* time);
 
 // @todo confirm
-void ptpd_update_time(const TimeInternal* time);
+void ptpd_update_time(const time_interval_t* time);
 
 bool ptpd_adj_frequency(int32_t adj);
 

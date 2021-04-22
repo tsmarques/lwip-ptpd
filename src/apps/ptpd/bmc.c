@@ -2,7 +2,7 @@
 #include <lwip/apps/ptpd.h>
 
 /* Convert EUI48 format to EUI64 */
-void EUI48toEUI64(const octet_t * eui48, octet_t * eui64)
+static void EUI48toEUI64(const octet_t * eui48, octet_t * eui64)
 {
   eui64[0] = eui48[0];
   eui64[1] = eui48[1];
@@ -15,218 +15,227 @@ void EUI48toEUI64(const octet_t * eui48, octet_t * eui64)
 }
 
 /* Init ptpClock with run time values (initialization constants are in constants.h) */
-void initData(PtpClock *ptpClock)
+void
+bcm_init_data(ptp_clock_t* clock)
 {
-  ptpd_opts* rtOpts;
+  ptpd_opts* opts;
 
-  DBG("initData\n");
-  rtOpts = ptpClock->rtOpts;
+  DBG("bcm_init_data\n");
+  opts = clock->opts;
 
   /* Default data set */
-  ptpClock->defaultDS.twoStepFlag = PTPD_DEFAULT_TWO_STEP_FLAG;
+  clock->default_ds.two_step_flag = PTPD_DEFAULT_TWO_STEP_FLAG;
 
   /* Init clockIdentity with MAC address and 0xFF and 0xFE. see spec 7.5.2.2.2 */
   if ((PTPD_CLOCK_IDENTITY_LENGTH == 8) && (PTP_UUID_LENGTH == 6))
   {
-    DBGVV("initData: EUI48toEUI64\n");
-    EUI48toEUI64(ptpClock->portUuidField, ptpClock->defaultDS.clockIdentity);
+    DBGVV("bcm_init_data: EUI48toEUI64\n");
+    EUI48toEUI64(clock->port_uuid_field, clock->default_ds.clock_identity);
   }
   else if (PTPD_CLOCK_IDENTITY_LENGTH == PTP_UUID_LENGTH)
   {
-    memcpy(ptpClock->defaultDS.clockIdentity, ptpClock->portUuidField, PTPD_CLOCK_IDENTITY_LENGTH);
+    memcpy(clock->default_ds.clock_identity, clock->port_uuid_field, PTPD_CLOCK_IDENTITY_LENGTH);
   }
   else
   {
-    ERROR("initData: UUID length is not valid");
+    ERROR("bcm_init_data: UUID length is not valid");
   }
 
-  ptpClock->defaultDS.numberPorts = PTPD_NUMBER_PORTS;
+  clock->default_ds.number_ports = PTPD_NUMBER_PORTS;
 
-  ptpClock->defaultDS.clockQuality.clockAccuracy = rtOpts->clockQuality.clockAccuracy;
-  ptpClock->defaultDS.clockQuality.clockClass = rtOpts->clockQuality.clockClass;
-  ptpClock->defaultDS.clockQuality.offsetScaledLogVariance = rtOpts->clockQuality.offsetScaledLogVariance;
+  clock->default_ds.clock_quality.clock_accuracy = opts->clock_quality.clock_accuracy;
+  clock->default_ds.clock_quality.clock_class = opts->clock_quality.clock_class;
+  clock->default_ds.clock_quality.offset_scaled_log_variance = opts->clock_quality.offset_scaled_log_variance;
 
-  ptpClock->defaultDS.priority1 = rtOpts->priority1;
-  ptpClock->defaultDS.priority2 = rtOpts->priority2;
+  clock->default_ds.priority1 = opts->priority1;
+  clock->default_ds.priority2 = opts->priority2;
 
-  ptpClock->defaultDS.domainNumber = rtOpts->domainNumber;
-  ptpClock->defaultDS.slaveOnly = rtOpts->slaveOnly;
+  clock->default_ds.domain_number = opts->domain_number;
+  clock->default_ds.slave_only = opts->slave_only;
 
   /* Port configuration data set */
 
   /* PortIdentity Init (portNumber = 1 for an ardinary clock spec 7.5.2.3)*/
-  memcpy(ptpClock->portDS.portIdentity.clockIdentity, ptpClock->defaultDS.clockIdentity, PTPD_CLOCK_IDENTITY_LENGTH);
-  ptpClock->portDS.portIdentity.portNumber = PTPD_NUMBER_PORTS;
-  ptpClock->portDS.logMinDelayReqInterval = PTPD_DEFAULT_DELAYREQ_INTERVAL;
-  ptpClock->portDS.peerMeanPathDelay.seconds = ptpClock->portDS.peerMeanPathDelay.nanoseconds = 0;
-  ptpClock->portDS.logAnnounceInterval = rtOpts->announceInterval;
-  ptpClock->portDS.announceReceiptTimeout = PTPD_DEFAULT_ANNOUNCE_RECEIPT_TIMEOUT;
-  ptpClock->portDS.logSyncInterval = rtOpts->syncInterval;
-  ptpClock->portDS.delayMechanism = rtOpts->delayMechanism;
-  ptpClock->portDS.logMinPdelayReqInterval = PTPD_DEFAULT_PDELAYREQ_INTERVAL;
-  ptpClock->portDS.versionNumber = PTPD_VERSION_PTP;
+  memcpy(clock->port_ds.port_identity.clock_identity, clock->default_ds.clock_identity, PTPD_CLOCK_IDENTITY_LENGTH);
+  clock->port_ds.port_identity.port_number = PTPD_NUMBER_PORTS;
+  clock->port_ds.log_min_delay_req_interval = PTPD_DEFAULT_DELAYREQ_INTERVAL;
+  clock->port_ds.peer_mean_path_delay.seconds = clock->port_ds.peer_mean_path_delay.nanoseconds = 0;
+  clock->port_ds.log_announce_interval = opts->announce_interval;
+  clock->port_ds.announce_receipt_timeout = PTPD_DEFAULT_ANNOUNCE_RECEIPT_TIMEOUT;
+  clock->port_ds.log_sync_interval = opts->sync_interval;
+  clock->port_ds.delay_mechanism = opts->delay_mechanism;
+  clock->port_ds.log_min_pdelay_req_interval = PTPD_DEFAULT_PDELAYREQ_INTERVAL;
+  clock->port_ds.versionNumber = PTPD_VERSION_PTP;
 
   /* Init other stuff */
-  ptpClock->foreignMasterDS.count = 0;
-  ptpClock->foreignMasterDS.capacity = rtOpts->maxForeignRecords;
+  clock->foreign_master_ds.count = 0;
+  clock->foreign_master_ds.capacity = opts->max_foreign_records;
 
-  ptpClock->inboundLatency = rtOpts->inboundLatency;
-  ptpClock->outboundLatency = rtOpts->outboundLatency;
+  clock->inbound_latency = opts->inbound_latency;
+  clock->outbound_latency = opts->outbound_latency;
 
-  ptpClock->servo.sDelay = rtOpts->servo.sDelay;
-  ptpClock->servo.sOffset = rtOpts->servo.sOffset;
-  ptpClock->servo.ai = rtOpts->servo.ai;
-  ptpClock->servo.ap = rtOpts->servo.ap;
-  ptpClock->servo.noAdjust = rtOpts->servo.noAdjust;
-  ptpClock->servo.noResetClock = rtOpts->servo.noResetClock;
+  clock->servo.s_delay = opts->servo.s_delay;
+  clock->servo.s_offset = opts->servo.s_offset;
+  clock->servo.ai = opts->servo.ai;
+  clock->servo.ap = opts->servo.ap;
+  clock->servo.no_adjust = opts->servo.no_adjust;
+  clock->servo.no_reset_clock = opts->servo.no_reset_clock;
 
-  ptpClock->stats = rtOpts->stats;
+  clock->stats = opts->stats;
 }
 
-bool isSamePortIdentity(const PortIdentity * A, const PortIdentity * B)
+bool
+bmc_is_same_poort_identity(const port_identity_t* A, const port_identity_t* B)
 {
-  return (bool)(0 == memcmp(A->clockIdentity, B->clockIdentity, PTPD_CLOCK_IDENTITY_LENGTH) && (A->portNumber == B->portNumber));
+  return (bool)(0 == memcmp(A->clock_identity, B->clock_identity, PTPD_CLOCK_IDENTITY_LENGTH) && (A->port_number == B->port_number));
 }
 
-void addForeign(PtpClock *ptpClock, const MsgHeader *header, const MsgAnnounce * announce)
+void
+bmc_add_foreign(ptp_clock_t* clock, const msg_header_t* header, const msg_announce_t* announce)
 {
   int i, j;
   bool found = FALSE;
 
-  j = ptpClock->foreignMasterDS.best;
+  j = clock->foreign_master_ds.best;
 
   /* Check if Foreign master is already known */
-  for (i = 0; i < ptpClock->foreignMasterDS.count; i++)
+  for (i = 0; i < clock->foreign_master_ds.count; i++)
   {
-    if (isSamePortIdentity(&header->sourcePortIdentity, &ptpClock->foreignMasterDS.records[j].foreignMasterPortIdentity))
+    if (bmc_is_same_poort_identity(&header->source_port_identity,
+                                   &clock->foreign_master_ds.records[j].port_identity))
     {
       /* Foreign Master is already in Foreignmaster data set */
-      ptpClock->foreignMasterDS.records[j].foreignMasterAnnounceMessages++;
+      clock->foreign_master_ds.records[j].announce_message++;
       found = TRUE;
-      DBGV("addForeign: AnnounceMessage incremented \n");
-      ptpClock->foreignMasterDS.records[j].header = *header;
-      ptpClock->foreignMasterDS.records[j].announce = *announce;
+      DBGV("bmc_add_foreign: AnnounceMessage incremented \n");
+      clock->foreign_master_ds.records[j].header = *header;
+      clock->foreign_master_ds.records[j].announce = *announce;
       break;
     }
 
-    j = (j + 1) % ptpClock->foreignMasterDS.count;
+    j = (j + 1) % clock->foreign_master_ds.count;
   }
 
   /* New Foreign Master */
   if (!found)
   {
-    if (ptpClock->foreignMasterDS.count < ptpClock->foreignMasterDS.capacity)
+    if (clock->foreign_master_ds.count < clock->foreign_master_ds.capacity)
     {
-      ptpClock->foreignMasterDS.count++;
+      clock->foreign_master_ds.count++;
     }
 
-    j = ptpClock->foreignMasterDS.i;
+    j = clock->foreign_master_ds.i;
 
     /* Copy new foreign master data set from Announce message */
-    memcpy(ptpClock->foreignMasterDS.records[j].foreignMasterPortIdentity.clockIdentity, header->sourcePortIdentity.clockIdentity, PTPD_CLOCK_IDENTITY_LENGTH);
-    ptpClock->foreignMasterDS.records[j].foreignMasterPortIdentity.portNumber = header->sourcePortIdentity.portNumber;
-    ptpClock->foreignMasterDS.records[j].foreignMasterAnnounceMessages = 0;
+    memcpy(clock->foreign_master_ds.records[j].port_identity.clock_identity, header->source_port_identity.clock_identity, PTPD_CLOCK_IDENTITY_LENGTH);
+    clock->foreign_master_ds.records[j].port_identity.port_number = header->source_port_identity.port_number;
+    clock->foreign_master_ds.records[j].announce_message = 0;
 
     /* Header and announce field of each Foreign Master are usefull to run Best Master Clock Algorithm */
-    ptpClock->foreignMasterDS.records[j].header = *header;
-    ptpClock->foreignMasterDS.records[j].announce = *announce;
-    DBGV("addForeign: New foreign Master added \n");
+    clock->foreign_master_ds.records[j].header = *header;
+    clock->foreign_master_ds.records[j].announce = *announce;
+    DBGV("bmc_add_foreign: New foreign Master added \n");
 
-    ptpClock->foreignMasterDS.i = (ptpClock->foreignMasterDS.i + 1) % ptpClock->foreignMasterDS.capacity;
+    clock->foreign_master_ds.i = (clock->foreign_master_ds.i + 1) % clock->foreign_master_ds.capacity;
   }
 }
 
-#define m2 m1
+#define m2 bmc_m1
 
 /* Local clock is becoming Master. Table 13 (9.3.5) of the spec.*/
-void m1(PtpClock *ptpClock)
+void
+bmc_m1(ptp_clock_t* clock)
 {
-  DBGV("bmc: m1\n");
+  DBGV("bmc: bmc_m1\n");
 
   /* Current data set update */
-  ptpClock->currentDS.stepsRemoved = 0;
-  ptpClock->currentDS.offsetFromMaster.seconds = ptpClock->currentDS.offsetFromMaster.nanoseconds = 0;
-  ptpClock->currentDS.meanPathDelay.seconds = ptpClock->currentDS.meanPathDelay.nanoseconds = 0;
+  clock->current_ds.steps_removed = 0;
+  clock->current_ds.offset_from_master.seconds = clock->current_ds.offset_from_master.nanoseconds = 0;
+  clock->current_ds.mean_path_delay.seconds = clock->current_ds.mean_path_delay.nanoseconds = 0;
 
   /* Parent data set */
-  memcpy(ptpClock->parentDS.parentPortIdentity.clockIdentity, ptpClock->defaultDS.clockIdentity,
+  memcpy(clock->parent_ds.parent_port_identity.clock_identity, clock->default_ds.clock_identity,
          PTPD_CLOCK_IDENTITY_LENGTH);
-  ptpClock->parentDS.parentPortIdentity.portNumber = 0;
-  memcpy(ptpClock->parentDS.grandmasterIdentity, ptpClock->defaultDS.clockIdentity, PTPD_CLOCK_IDENTITY_LENGTH);
-  ptpClock->parentDS.grandmasterClockQuality.clockAccuracy = ptpClock->defaultDS.clockQuality.clockAccuracy;
-  ptpClock->parentDS.grandmasterClockQuality.clockClass = ptpClock->defaultDS.clockQuality.clockClass;
-  ptpClock->parentDS.grandmasterClockQuality.offsetScaledLogVariance = ptpClock->defaultDS.clockQuality.offsetScaledLogVariance;
-  ptpClock->parentDS.grandmasterPriority1 = ptpClock->defaultDS.priority1;
-  ptpClock->parentDS.grandmasterPriority2 = ptpClock->defaultDS.priority2;
+  clock->parent_ds.parent_port_identity.port_number = 0;
+  memcpy(clock->parent_ds.grandmaster_identity, clock->default_ds.clock_identity, PTPD_CLOCK_IDENTITY_LENGTH);
+  clock->parent_ds.grandmaster_clock_quality.clock_accuracy = clock->default_ds.clock_quality.clock_accuracy;
+  clock->parent_ds.grandmaster_clock_quality.clock_class = clock->default_ds.clock_quality.clock_class;
+  clock->parent_ds.grandmaster_clock_quality.offset_scaled_log_variance =
+      clock->default_ds.clock_quality.offset_scaled_log_variance;
+  clock->parent_ds.grandmaster_priority1 = clock->default_ds.priority1;
+  clock->parent_ds.grandmaster_priority2 = clock->default_ds.priority2;
 
   /* Time Properties data set */
-  ptpClock->timePropertiesDS.currentUtcOffset = ptpClock->rtOpts->currentUtcOffset;
-  ptpClock->timePropertiesDS.currentUtcOffsetValid = PTPD_DEFAULT_UTC_VALID;
-  ptpClock->timePropertiesDS.leap59 = FALSE;
-  ptpClock->timePropertiesDS.leap61 = FALSE;
-  ptpClock->timePropertiesDS.timeTraceable = PTPD_DEFAULT_TIME_TRACEABLE;
-  ptpClock->timePropertiesDS.frequencyTraceable = PTPD_DEFAULT_FREQUENCY_TRACEABLE;
-  ptpClock->timePropertiesDS.ptpTimescale = (bool)(PTPD_DEFAULT_TIMESCALE == PTP_TIMESCALE);
-  ptpClock->timePropertiesDS.timeSource = PTPD_DEFAULT_TIME_SOURCE;
+  clock->time_properties_ds.current_utc_offset = clock->opts->current_utc_offset;
+  clock->time_properties_ds.current_utc_offset_valid = PTPD_DEFAULT_UTC_VALID;
+  clock->time_properties_ds.leap59 = FALSE;
+  clock->time_properties_ds.leap61 = FALSE;
+  clock->time_properties_ds.time_traceable = PTPD_DEFAULT_TIME_TRACEABLE;
+  clock->time_properties_ds.frequency_traceable = PTPD_DEFAULT_FREQUENCY_TRACEABLE;
+  clock->time_properties_ds.ptp_timescale = (bool)(PTPD_DEFAULT_TIMESCALE == PTP_TIMESCALE);
+  clock->time_properties_ds.time_source = PTPD_DEFAULT_TIME_SOURCE;
 }
 
-void p1(PtpClock *ptpClock)
+void
+bmc_p1(ptp_clock_t* clock)
 {
-  DBGV("bmc: p1\n");
+  DBGV("bmc: bmc_p1\n");
 }
 
 /* Local clock is synchronized to Ebest Table 16 (9.3.5) of the spec */
-void s1(PtpClock *ptpClock, const MsgHeader *header, const MsgAnnounce *announce)
+void
+bmc_s1(ptp_clock_t* clock, const msg_header_t* header, const msg_announce_t* announce)
 {
-  bool isFromCurrentParent;
+  bool is_from_current_parent;
 
-  DBGV("bmc: s1\n");
+  DBGV("bmc: bmc_s1\n");
 
   /* Current DS */
-  ptpClock->currentDS.stepsRemoved = announce->stepsRemoved + 1;
+  clock->current_ds.steps_removed = announce->steps_removed + 1;
 
-  isFromCurrentParent = isSamePortIdentity(&ptpClock->parentDS.parentPortIdentity, &header->sourcePortIdentity);
+  is_from_current_parent =
+      bmc_is_same_poort_identity(&clock->parent_ds.parent_port_identity, &header->source_port_identity);
 
-  if (!isFromCurrentParent)
+  if (!is_from_current_parent)
   {
-    setFlag(ptpClock->events, MASTER_CLOCK_CHANGED);
+    setFlag(clock->events, MASTER_CLOCK_CHANGED);
   }
 
   /* Parent DS */
-  memcpy(ptpClock->parentDS.parentPortIdentity.clockIdentity, header->sourcePortIdentity.clockIdentity,
+  memcpy(clock->parent_ds.parent_port_identity.clock_identity, header->source_port_identity.clock_identity,
          PTPD_CLOCK_IDENTITY_LENGTH);
-  ptpClock->parentDS.parentPortIdentity.portNumber = header->sourcePortIdentity.portNumber;
-  memcpy(ptpClock->parentDS.grandmasterIdentity, announce->grandmasterIdentity, PTPD_CLOCK_IDENTITY_LENGTH);
-  ptpClock->parentDS.grandmasterClockQuality.clockAccuracy = announce->grandmasterClockQuality.clockAccuracy;
-  ptpClock->parentDS.grandmasterClockQuality.clockClass = announce->grandmasterClockQuality.clockClass;
-  ptpClock->parentDS.grandmasterClockQuality.offsetScaledLogVariance = announce->grandmasterClockQuality.offsetScaledLogVariance;
-  ptpClock->parentDS.grandmasterPriority1 = announce->grandmasterPriority1;
-  ptpClock->parentDS.grandmasterPriority2 = announce->grandmasterPriority2;
+  clock->parent_ds.parent_port_identity.port_number = header->source_port_identity.port_number;
+  memcpy(clock->parent_ds.grandmaster_identity, announce->grandmaster_identity, PTPD_CLOCK_IDENTITY_LENGTH);
+  clock->parent_ds.grandmaster_clock_quality.clock_accuracy = announce->grandmaster_clock_quality.clock_accuracy;
+  clock->parent_ds.grandmaster_clock_quality.clock_class = announce->grandmaster_clock_quality.clock_class;
+  clock->parent_ds.grandmaster_clock_quality.offset_scaled_log_variance = announce->grandmaster_clock_quality.offset_scaled_log_variance;
+  clock->parent_ds.grandmaster_priority1 = announce->grandmaster_priority1;
+  clock->parent_ds.grandmaster_priority2 = announce->grandmaster_priority2;
 
   /* Timeproperties DS */
-  ptpClock->timePropertiesDS.currentUtcOffset = announce->currentUtcOffset;
-  ptpClock->timePropertiesDS.currentUtcOffsetValid = getFlag(header->flagField[1], FLAG1_UTC_OFFSET_VALID);
-  ptpClock->timePropertiesDS.leap59 = getFlag(header->flagField[1], FLAG1_LEAP59);
-  ptpClock->timePropertiesDS.leap61 = getFlag(header->flagField[1], FLAG1_LEAP61);
-  ptpClock->timePropertiesDS.timeTraceable = getFlag(header->flagField[1], FLAG1_TIME_TRACEABLE);
-  ptpClock->timePropertiesDS.frequencyTraceable = getFlag(header->flagField[1], FLAG1_FREQUENCY_TRACEABLE);
-  ptpClock->timePropertiesDS.ptpTimescale = getFlag(header->flagField[1], FLAG1_PTP_TIMESCALE);
-  ptpClock->timePropertiesDS.timeSource = announce->timeSource;
+  clock->time_properties_ds.current_utc_offset = announce->current_utc_offset;
+  clock->time_properties_ds.current_utc_offset_valid = getFlag(header->flag_field[1], FLAG1_UTC_OFFSET_VALID);
+  clock->time_properties_ds.leap59 = getFlag(header->flag_field[1], FLAG1_LEAP59);
+  clock->time_properties_ds.leap61 = getFlag(header->flag_field[1], FLAG1_LEAP61);
+  clock->time_properties_ds.time_traceable = getFlag(header->flag_field[1], FLAG1_TIME_TRACEABLE);
+  clock->time_properties_ds.frequency_traceable = getFlag(header->flag_field[1], FLAG1_FREQUENCY_TRACEABLE);
+  clock->time_properties_ds.ptp_timescale = getFlag(header->flag_field[1], FLAG1_PTP_TIMESCALE);
+  clock->time_properties_ds.time_source = announce->time_source;
 }
 
 /**
  * \brief Copy local data set into header and announce message. 9.3.4 table 12
  */
-void copyD0(MsgHeader *header, MsgAnnounce *announce, PtpClock *ptpClock)
+static void copyD0(msg_header_t*header, msg_announce_t*announce, ptp_clock_t*ptpClock)
 {
-  announce->grandmasterPriority1 = ptpClock->defaultDS.priority1;
-  memcpy(announce->grandmasterIdentity, ptpClock->defaultDS.clockIdentity, PTPD_CLOCK_IDENTITY_LENGTH);
-  announce->grandmasterClockQuality.clockClass = ptpClock->defaultDS.clockQuality.clockClass;
-  announce->grandmasterClockQuality.clockAccuracy = ptpClock->defaultDS.clockQuality.clockAccuracy;
-  announce->grandmasterClockQuality.offsetScaledLogVariance = ptpClock->defaultDS.clockQuality.offsetScaledLogVariance;
-  announce->grandmasterPriority2 = ptpClock->defaultDS.priority2;
-  announce->stepsRemoved = 0;
-  memcpy(header->sourcePortIdentity.clockIdentity, ptpClock->defaultDS.clockIdentity, PTPD_CLOCK_IDENTITY_LENGTH);
+  announce->grandmaster_priority1 = ptpClock->default_ds.priority1;
+  memcpy(announce->grandmaster_identity, ptpClock->default_ds.clock_identity, PTPD_CLOCK_IDENTITY_LENGTH);
+  announce->grandmaster_clock_quality.clock_class = ptpClock->default_ds.clock_quality.clock_class;
+  announce->grandmaster_clock_quality.clock_accuracy = ptpClock->default_ds.clock_quality.clock_accuracy;
+  announce->grandmaster_clock_quality.offset_scaled_log_variance = ptpClock->default_ds.clock_quality.offset_scaled_log_variance;
+  announce->grandmaster_priority2 = ptpClock->default_ds.priority2;
+  announce->steps_removed = 0;
+  memcpy(header->source_port_identity.clock_identity, ptpClock->default_ds.clock_identity, PTPD_CLOCK_IDENTITY_LENGTH);
 }
 
 
@@ -240,154 +249,156 @@ void copyD0(MsgHeader *header, MsgAnnounce *announce, PtpClock *ptpClock)
 
 #define COMPARE_AB_RETURN_BETTER(cond, msg)                             \
 	if ((announceA->cond) > (announceB->cond)) {                           \
-		DBGVV("bmcDataSetComparison: " msg ": B better then A\n");          \
+		DBGVV("compare_dataset: " msg ": B better then A\n");          \
 		return B_better_then_A;                                             \
 	}                                                                     \
 	if ((announceB->cond) > (announceA->cond)) {                           \
-		DBGVV("bmcDataSetComparison: " msg ": A better then B\n");          \
+		DBGVV("compare_dataset: " msg ": A better then B\n");          \
 		return A_better_then_B;                                             \
 	}                                                                     \
 
 /* Data set comparison bewteen two foreign masters (9.3.4 fig 27) return similar to memcmp() */
-int8_t bmcDataSetComparison(MsgHeader *headerA, MsgAnnounce *announceA,
-                            MsgHeader *headerB, MsgAnnounce *announceB, PtpClock *ptpClock)
+static int8_t
+compare_dataset(msg_header_t*headerA, msg_announce_t*announceA, msg_header_t*headerB, msg_announce_t*announceB,
+                     ptp_clock_t*ptpClock)
 {
-  int grandmasterIdentityComp;
+  int grandmaster_identity_comp;
   short comp = 0;
 
-  DBGV("bmcDataSetComparison\n");
+  DBGV("compare_dataset\n");
   /* Identity comparison */
 
   /* GM identity of A == GM identity of B */
   /* TODO: zkontrolovat memcmp, co vraci za vysledky !*/
-  grandmasterIdentityComp = memcmp(announceA->grandmasterIdentity, announceB->grandmasterIdentity, PTPD_CLOCK_IDENTITY_LENGTH);
+  grandmaster_identity_comp = memcmp(announceA->grandmaster_identity, announceB->grandmaster_identity, PTPD_CLOCK_IDENTITY_LENGTH);
 
-  if (0 != grandmasterIdentityComp)
+  if (0 != grandmaster_identity_comp)
   {
     /* Algoritgm part 1 - Figure 27 */
-    COMPARE_AB_RETURN_BETTER(grandmasterPriority1,"grandmaster.Priority1");
-    COMPARE_AB_RETURN_BETTER(grandmasterClockQuality.clockClass,"grandmaster.clockClass");
-    COMPARE_AB_RETURN_BETTER(grandmasterClockQuality.clockAccuracy,"grandmaster.clockAccuracy");
-    COMPARE_AB_RETURN_BETTER(grandmasterClockQuality.offsetScaledLogVariance,"grandmaster.Variance");
-    COMPARE_AB_RETURN_BETTER(grandmasterPriority2,"grandmaster.Priority2");
+    COMPARE_AB_RETURN_BETTER(grandmaster_priority1,"grandmaster.Priority1");
+    COMPARE_AB_RETURN_BETTER(grandmaster_clock_quality.clock_class,"grandmaster.clockClass");
+    COMPARE_AB_RETURN_BETTER(grandmaster_clock_quality.clock_accuracy,"grandmaster.clockAccuracy");
+    COMPARE_AB_RETURN_BETTER(grandmaster_clock_quality.offset_scaled_log_variance,"grandmaster.Variance");
+    COMPARE_AB_RETURN_BETTER(grandmaster_priority2,"grandmaster.Priority2");
 
-    if (grandmasterIdentityComp > 0)
+    if (grandmaster_identity_comp > 0)
     {
-      DBGVV("bmcDataSetComparison: grandmaster.Identity: B better then A\n");
+      DBGVV("compare_dataset: grandmaster.Identity: B better then A\n");
       return B_better_then_A;
     }
-    else if (grandmasterIdentityComp < 0)
+    else if (grandmaster_identity_comp < 0)
     {
-      DBGVV("bmcDataSetComparison: grandmaster.Identity: A better then B\n");
+      DBGVV("compare_dataset: grandmaster.Identity: A better then B\n");
       return A_better_then_B;
     }
   }
 
   /* Algoritgm part 2 - Figure 28 */
-  if ((announceA->stepsRemoved) > (announceB->stepsRemoved + 1))
+  if ((announceA->steps_removed) > (announceB->steps_removed + 1))
   {
-    DBGVV("bmcDataSetComparison: stepsRemoved: B better then A\n");
+    DBGVV("compare_dataset: stepsRemoved: B better then A\n");
     return B_better_then_A;
   }
 
-  if ((announceB->stepsRemoved) > (announceA->stepsRemoved + 1))
+  if ((announceB->steps_removed) > (announceA->steps_removed + 1))
   {
-    DBGVV("bmcDataSetComparison: stepsRemoved: A better then B\n");
+    DBGVV("compare_dataset: stepsRemoved: A better then B\n");
     return A_better_then_B;
   }
 
-  if ((announceA->stepsRemoved) > (announceB->stepsRemoved))
+  if ((announceA->steps_removed) > (announceB->steps_removed))
   {
-    comp = memcmp(headerA->sourcePortIdentity.clockIdentity, ptpClock->portDS.portIdentity.clockIdentity,
+    comp = memcmp(headerA->source_port_identity.clock_identity, ptpClock->port_ds.port_identity.clock_identity,
                   PTPD_CLOCK_IDENTITY_LENGTH);
 
     if (comp > 0)
     {
       /* reciever < sender */
-      DBGVV("bmcDataSetComparison: PortIdentity: B better then A\n");
+      DBGVV("compare_dataset: PortIdentity: B better then A\n");
       return B_better_then_A;
     }
     else if (comp < 0)
     {
       /* reciever > sender */
-      DBGVV("bmcDataSetComparison: PortIdentity: B better by topology then A\n");
+      DBGVV("compare_dataset: PortIdentity: B better by topology then A\n");
       return B_better_by_topology_then_A;
     }
     else
     {
-      DBGVV("bmcDataSetComparison: ERROR 1\n");
+      DBGVV("compare_dataset: ERROR 1\n");
       return ERROR_1;
     }
   }
-  else if ((announceA->stepsRemoved) < (announceB->stepsRemoved))
+  else if ((announceA->steps_removed) < (announceB->steps_removed))
   {
-    comp = memcmp(headerB->sourcePortIdentity.clockIdentity, ptpClock->portDS.portIdentity.clockIdentity,
+    comp = memcmp(headerB->source_port_identity.clock_identity, ptpClock->port_ds.port_identity.clock_identity,
                   PTPD_CLOCK_IDENTITY_LENGTH);
     if (comp > 0)
     {
       /* reciever < sender */
-      DBGVV("bmcDataSetComparison: PortIdentity: A better then B\n");
+      DBGVV("compare_dataset: PortIdentity: A better then B\n");
       return A_better_then_B;
     }
     else if (comp < 0)
     {
       /* reciever > sender */
-      DBGVV("bmcDataSetComparison: PortIdentity: A better by topology then B\n");
+      DBGVV("compare_dataset: PortIdentity: A better by topology then B\n");
       return A_better_by_topology_then_B;
     }
     else
     {
-      DBGV("bmcDataSetComparison: ERROR 1\n");
+      DBGV("compare_dataset: ERROR 1\n");
       return ERROR_1;
     }
   }
 
-  comp = memcmp(headerA->sourcePortIdentity.clockIdentity, headerB->sourcePortIdentity.clockIdentity,
+  comp = memcmp(headerA->source_port_identity.clock_identity, headerB->source_port_identity.clock_identity,
                 PTPD_CLOCK_IDENTITY_LENGTH);
   if (comp > 0)
   {
     /* A > B */
-    DBGVV("bmcDataSetComparison: sourcePortIdentity: B better by topology then A\n");
+    DBGVV("compare_dataset: sourcePortIdentity: B better by topology then A\n");
     return B_better_by_topology_then_A;
   }
   else if (comp < 0)
   {
     /* B > A */
-    DBGVV("bmcDataSetComparison: sourcePortIdentity: A better by topology then B\n");
+    DBGVV("compare_dataset: sourcePortIdentity: A better by topology then B\n");
     return A_better_by_topology_then_B;
   }
 
   /* compare port numbers of recievers of A and B - same as we have only one port */
-  DBGV("bmcDataSetComparison: ERROR 2\n");
+  DBGV("compare_dataset: ERROR 2\n");
   return ERROR_2;
 }
 
 /* State decision algorithm 9.3.3 Fig 26 */
-uint8_t bmcStateDecision(MsgHeader *header, MsgAnnounce *announce, PtpClock *ptpClock)
+static uint8_t
+state_decision(msg_header_t*header, msg_announce_t*announce, ptp_clock_t*ptpClock)
 {
   int comp;
 
-  if ((!ptpClock->foreignMasterDS.count) && (ptpClock->portDS.portState == PTP_LISTENING))
+  if ((!ptpClock->foreign_master_ds.count) && (ptpClock->port_ds.port_state == PTP_LISTENING))
   {
     return PTP_LISTENING;
   }
 
-  copyD0(&ptpClock->msgTmpHeader, &ptpClock->msgTmp.announce, ptpClock);
+  copyD0(&ptpClock->bfr_header, &ptpClock->msgTmp.announce, ptpClock);
 
-  comp = bmcDataSetComparison(&ptpClock->msgTmpHeader, &ptpClock->msgTmp.announce, header, announce, ptpClock);
+  comp = compare_dataset(&ptpClock->bfr_header, &ptpClock->msgTmp.announce, header, announce, ptpClock);
 
-  DBGV("bmcStateDecision: %d\n", comp);
+  DBGV("state_decision: %d\n", comp);
 
-  if (ptpClock->defaultDS.clockQuality.clockClass < 128)
+  if (ptpClock->default_ds.clock_quality.clock_class < 128)
   {
     if (A_better_then_B == comp)
     {
-      m1(ptpClock);  /* M1 */
+      bmc_m1(ptpClock);  /* M1 */
       return PTP_MASTER;
     }
     else
     {
-      p1(ptpClock);
+      bmc_p1(ptpClock);
       return PTP_PASSIVE;
     }
   }
@@ -400,7 +411,7 @@ uint8_t bmcStateDecision(MsgHeader *header, MsgAnnounce *announce, PtpClock *ptp
     }
     else
     {
-      s1(ptpClock, header, announce);
+      bmc_s1(ptpClock, header, announce);
       return PTP_SLAVE;
     }
   }
@@ -408,22 +419,25 @@ uint8_t bmcStateDecision(MsgHeader *header, MsgAnnounce *announce, PtpClock *ptp
 
 
 
-uint8_t bmc(PtpClock *ptpClock)
+uint8_t bmc(ptp_clock_t* clock)
 {
   int16_t i, best;
 
   /* Starting from i = 1, not necessery to test record[i = 0] against record[best = 0] -> they are the same */
-  for (i = 1, best = 0; i < ptpClock->foreignMasterDS.count; i++)
+  for (i = 1, best = 0; i < clock->foreign_master_ds.count; i++)
   {
-    if ((bmcDataSetComparison(&ptpClock->foreignMasterDS.records[i].header, &ptpClock->foreignMasterDS.records[i].announce,
-                              &ptpClock->foreignMasterDS.records[best].header, &ptpClock->foreignMasterDS.records[best].announce, ptpClock)) < 0)
+    if ((compare_dataset(&clock->foreign_master_ds.records[i].header,
+                         &clock->foreign_master_ds.records[i].announce,
+                         &clock->foreign_master_ds.records[best].header,
+                         &clock->foreign_master_ds.records[best].announce, clock)) < 0)
     {
       best = i;
     }
   }
 
   DBGV("bmc: best record %d\n", best);
-  ptpClock->foreignMasterDS.best = best;
+  clock->foreign_master_ds.best = best;
 
-  return bmcStateDecision(&ptpClock->foreignMasterDS.records[best].header, &ptpClock->foreignMasterDS.records[best].announce, ptpClock);
+  return state_decision(&clock->foreign_master_ds.records[best].header,
+                        &clock->foreign_master_ds.records[best].announce, clock);
 }

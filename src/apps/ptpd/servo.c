@@ -1,20 +1,21 @@
 #include <lwip/apps/ptpd.h>
 
-void initClock(PtpClock *ptpClock)
+void
+servo_init_clock(ptp_clock_t* clock)
 {
-  DBG("initClock\n");
+  DBG("servo_init_clock\n");
 
   /* Clear vars */
-  ptpClock->Tms.seconds = ptpClock->Tms.nanoseconds = 0;
-  ptpClock->observedDrift = 0;  /* clears clock servo accumulator (the I term) */
+  clock->time_ms.seconds = clock->time_ms.nanoseconds = 0;
+  clock->observed_drift = 0;  /* clears clock servo accumulator (the I term) */
 
   /* One way delay */
-  ptpClock->owd_filt.n = 0;
-  ptpClock->owd_filt.s = ptpClock->servo.sDelay;
+  clock->owd_filt.n = 0;
+  clock->owd_filt.s = clock->servo.s_delay;
 
   /* Offset from master */
-  ptpClock->ofm_filt.n = 0;
-  ptpClock->ofm_filt.s = ptpClock->servo.sOffset;
+  clock->ofm_filt.n = 0;
+  clock->ofm_filt.s = clock->servo.s_offset;
 
   /* Scaled log variance */
 #if PTPD_DEFAULT_PARENTS_STATS == 1
@@ -24,25 +25,25 @@ void initClock(PtpClock *ptpClock)
     ptpClock->offsetHistory[1] = 0;
 #endif
 
-  ptpClock->waitingForFollowUp = FALSE;
+    clock->waiting_for_followup = FALSE;
 
-  ptpClock->waitingForPDelayRespFollowUp = FALSE;
+    clock->waiting_for_pdelay_resp_followup = FALSE;
 
-  ptpClock->pdelay_t1.seconds = ptpClock->pdelay_t1.nanoseconds = 0;
-  ptpClock->pdelay_t2.seconds = ptpClock->pdelay_t2.nanoseconds = 0;
-  ptpClock->pdelay_t3.seconds = ptpClock->pdelay_t3.nanoseconds = 0;
-  ptpClock->pdelay_t4.seconds = ptpClock->pdelay_t4.nanoseconds = 0;
+    clock->pdelay_t1.seconds = clock->pdelay_t1.nanoseconds = 0;
+    clock->pdelay_t2.seconds = clock->pdelay_t2.nanoseconds = 0;
+    clock->pdelay_t3.seconds = clock->pdelay_t3.nanoseconds = 0;
+    clock->pdelay_t4.seconds = clock->pdelay_t4.nanoseconds = 0;
 
   /* Reset parent statistics */
-  ptpClock->parentDS.parentStats = FALSE;
-  ptpClock->parentDS.observedParentClockPhaseChangeRate = 0;
-  ptpClock->parentDS.observedParentOffsetScaledLogVariance = 0;
+    clock->parent_ds.parent_stats = FALSE;
+    clock->parent_ds.observed_parent_clock_phase_change_rate = 0;
+    clock->parent_ds.observed_parent_offset_scaled_log_variance = 0;
 
   /* Level clock */
-  if (!ptpClock->servo.noAdjust)
+  if (!clock->servo.no_adjust)
     ptpd_adj_frequency(0);
 
-  ptpd_empty_event_queue(&ptpClock->netPath);
+  ptpd_empty_event_queue(&clock->net_path);
 }
 
 static int32_t order(int32_t n)
@@ -53,7 +54,7 @@ static int32_t order(int32_t n)
   if (n == 0) {
     return 0;
   }
-  return floorLog2(n);
+  return ptp_floor_log2(n);
 }
 
 /* Exponencial smoothing */
@@ -126,148 +127,154 @@ static void filter(int32_t * nsec_current, Filter * filt)
 }
 
 /* 11.2 */
-void updateOffset(PtpClock *ptpClock, const TimeInternal *syncEventIngressTimestamp,
-                  const TimeInternal *preciseOriginTimestamp, const TimeInternal *correctionField)
+void
+servo_update_offset(ptp_clock_t* clock, const time_interval_t* sync_event_ingress_timestamp,
+                  const time_interval_t* precise_origin_timestamp, const time_interval_t* correction_field)
 {
-  DBGV("updateOffset\n");
+  DBGV("servo_update_offset\n");
 
   /*  <offsetFromMaster> = <syncEventIngressTimestamp> - <preciseOriginTimestamp>
            - <meanPathDelay>  -  correctionField  of  Sync  message
            -  correctionField  of  Follow_Up message. */
 
   /* Compute offsetFromMaster */
-  subTime(&ptpClock->Tms, syncEventIngressTimestamp, preciseOriginTimestamp);
-  subTime(&ptpClock->Tms, &ptpClock->Tms, correctionField);
+  ptp_sub_time(&clock->time_ms, sync_event_ingress_timestamp, precise_origin_timestamp);
+  ptp_sub_time(&clock->time_ms, &clock->time_ms, correction_field);
 
-  ptpClock->currentDS.offsetFromMaster = ptpClock->Tms;
+  clock->current_ds.offset_from_master = clock->time_ms;
 
-  switch (ptpClock->portDS.delayMechanism)
+  switch (clock->port_ds.delay_mechanism)
   {
     case E2E:
-      subTime(&ptpClock->currentDS.offsetFromMaster, &ptpClock->currentDS.offsetFromMaster, &ptpClock->currentDS.meanPathDelay);
+      ptp_sub_time(&clock->current_ds.offset_from_master, &clock->current_ds.offset_from_master,
+                   &clock->current_ds.mean_path_delay);
       break;
 
     case P2P:
-      subTime(&ptpClock->currentDS.offsetFromMaster, &ptpClock->currentDS.offsetFromMaster, &ptpClock->portDS.peerMeanPathDelay);
+      ptp_sub_time(&clock->current_ds.offset_from_master, &clock->current_ds.offset_from_master,
+                   &clock->port_ds.peer_mean_path_delay);
       break;
 
     default:
       break;
   }
 
-  if (ptpClock->currentDS.offsetFromMaster.seconds != 0)
+  if (clock->current_ds.offset_from_master.seconds != 0)
   {
-    if (ptpClock->portDS.portState == PTP_SLAVE)
+    if (clock->port_ds.port_state == PTP_SLAVE)
     {
-      setFlag(ptpClock->events, SYNCHRONIZATION_FAULT);
+      setFlag(clock->events, SYNCHRONIZATION_FAULT);
     }
 
-    DBGV("updateOffset: cannot filter seconds\n");
+    DBGV("servo_update_offset: cannot filter seconds\n");
 
     return;
   }
 
   /* Filter offsetFromMaster */
-  filter(&ptpClock->currentDS.offsetFromMaster.nanoseconds, &ptpClock->ofm_filt);
+  filter(&clock->current_ds.offset_from_master.nanoseconds, &clock->ofm_filt);
 
   /* Check results */
-  if (abs(ptpClock->currentDS.offsetFromMaster.nanoseconds) < PTPD_DEFAULT_CALIBRATED_OFFSET_NS)
+  if (abs(clock->current_ds.offset_from_master.nanoseconds) < PTPD_DEFAULT_CALIBRATED_OFFSET_NS)
   {
-    if (ptpClock->portDS.portState == PTP_UNCALIBRATED)
+    if (clock->port_ds.port_state == PTP_UNCALIBRATED)
     {
-      setFlag(ptpClock->events, MASTER_CLOCK_SELECTED);
+      setFlag(clock->events, MASTER_CLOCK_SELECTED);
     }
   }
-  else if (abs(ptpClock->currentDS.offsetFromMaster.nanoseconds) > PTPD_DEFAULT_UNCALIBRATED_OFFSET_NS)
+  else if (abs(clock->current_ds.offset_from_master.nanoseconds) > PTPD_DEFAULT_UNCALIBRATED_OFFSET_NS)
   {
-    if (ptpClock->portDS.portState == PTP_SLAVE)
+    if (clock->port_ds.port_state == PTP_SLAVE)
     {
-      setFlag(ptpClock->events, SYNCHRONIZATION_FAULT);
+      setFlag(clock->events, SYNCHRONIZATION_FAULT);
     }
   }
 }
 
 /* 11.3 */
-void updateDelay(PtpClock * ptpClock, const TimeInternal *delayEventEgressTimestamp,
-                 const TimeInternal *recieveTimestamp, const TimeInternal *correctionField)
+void
+servo_update_delay(ptp_clock_t* clock, const time_interval_t* delay_event_egress_timestamp,
+                 const time_interval_t* recv_timestamp, const time_interval_t* correction_field)
 {
   /* Tms valid ? */
-  if (0 == ptpClock->ofm_filt.n)
+  if (0 == clock->ofm_filt.n)
   {
-    DBGV("updateDelay: Tms is not valid");
+    DBGV("servo_update_delay: Tms is not valid");
     return;
   }
 
-  subTime(&ptpClock->Tsm, recieveTimestamp, delayEventEgressTimestamp);
-  subTime(&ptpClock->Tsm, &ptpClock->Tsm, correctionField);
-  addTime(&ptpClock->currentDS.meanPathDelay, &ptpClock->Tms, &ptpClock->Tsm);
-  div2Time(&ptpClock->currentDS.meanPathDelay);
+  ptp_sub_time(&clock->time_sm, recv_timestamp, delay_event_egress_timestamp);
+  ptp_sub_time(&clock->time_sm, &clock->time_sm, correction_field);
+  ptp_time_add(&clock->current_ds.mean_path_delay, &clock->time_ms, &clock->time_sm);
+  ptp_time_halve(&clock->current_ds.mean_path_delay);
 
   /* Filter delay */
-  if (0 != ptpClock->currentDS.meanPathDelay.seconds)
+  if (0 != clock->current_ds.mean_path_delay.seconds)
   {
-    DBGV("updateDelay: cannot filter with seconds");
+    DBGV("servo_update_delay: cannot filter with seconds");
   }
   else
   {
-    filter(&ptpClock->currentDS.meanPathDelay.nanoseconds, &ptpClock->owd_filt);
+    filter(&clock->current_ds.mean_path_delay.nanoseconds, &clock->owd_filt);
   }
 }
 
-void updatePeerDelay(PtpClock *ptpClock, const TimeInternal *correctionField, bool  twoStep)
+void
+servo_update_peer_delay(ptp_clock_t* clock, const time_interval_t* correction_field, bool is_two_step)
 {
-  DBGV("updatePeerDelay\n");
+  DBGV("servo_update_peer_delay\n");
 
-  if (twoStep)
+  if (is_two_step)
   {
-    TimeInternal Tab, Tba;
-    subTime(&Tab, &ptpClock->pdelay_t2 , &ptpClock->pdelay_t1);
-    subTime(&Tba, &ptpClock->pdelay_t4, &ptpClock->pdelay_t3);
-    addTime(&ptpClock->portDS.peerMeanPathDelay, &Tab, &Tba);
+    time_interval_t Tab, Tba;
+    ptp_sub_time(&Tab, &clock->pdelay_t2, &clock->pdelay_t1);
+    ptp_sub_time(&Tba, &clock->pdelay_t4, &clock->pdelay_t3);
+    ptp_time_add(&clock->port_ds.peer_mean_path_delay, &Tab, &Tba);
   }
   else /* One step  clock */
   {
-    subTime(&ptpClock->portDS.peerMeanPathDelay, &ptpClock->pdelay_t4, &ptpClock->pdelay_t1);
+    ptp_sub_time(&clock->port_ds.peer_mean_path_delay, &clock->pdelay_t4, &clock->pdelay_t1);
   }
 
-  subTime(&ptpClock->portDS.peerMeanPathDelay, &ptpClock->portDS.peerMeanPathDelay, correctionField);
-  div2Time(&ptpClock->portDS.peerMeanPathDelay);
+  ptp_sub_time(&clock->port_ds.peer_mean_path_delay, &clock->port_ds.peer_mean_path_delay, correction_field);
+  ptp_time_halve(&clock->port_ds.peer_mean_path_delay);
 
   /* Filter delay */
-  if (ptpClock->portDS.peerMeanPathDelay.seconds != 0)
+  if (clock->port_ds.peer_mean_path_delay.seconds != 0)
   {
-    DBGV("updatePeerDelay: cannot filter with seconds");
+    DBGV("servo_update_peer_delay: cannot filter with seconds");
     return;
   }
   else
   {
-    filter(&ptpClock->portDS.peerMeanPathDelay.nanoseconds, &ptpClock->owd_filt);
+    filter(&clock->port_ds.peer_mean_path_delay.nanoseconds, &clock->owd_filt);
   }
 }
 
-void updateClock(PtpClock *ptpClock)
+void
+servo_update_clock(ptp_clock_t* clock)
 {
   int32_t adj;
-  TimeInternal timeTmp;
+  time_interval_t timeTmp;
   int32_t offsetNorm;
 
-  DBGV("updateClock\n");
+  DBGV("servo_update_clock\n");
 
-  if (ptpClock->currentDS.offsetFromMaster.seconds != 0 || abs(ptpClock->currentDS.offsetFromMaster.nanoseconds) > PTPD_MAX_ADJ_OFFSET_NS)
+  if (clock->current_ds.offset_from_master.seconds != 0 || abs(clock->current_ds.offset_from_master.nanoseconds) > PTPD_MAX_ADJ_OFFSET_NS)
   {
     /* if secs, reset clock or set freq adjustment to max */
-    if (!ptpClock->servo.noAdjust)
+    if (!clock->servo.no_adjust)
     {
-      if (!ptpClock->servo.noResetClock)
+      if (!clock->servo.no_reset_clock)
       {
         bsp_get_time(&timeTmp);
-        subTime(&timeTmp, &timeTmp, &ptpClock->currentDS.offsetFromMaster);
+        ptp_sub_time(&timeTmp, &timeTmp, &clock->current_ds.offset_from_master);
         bsp_set_time(&timeTmp);
-        initClock(ptpClock);
+        servo_init_clock(clock);
       }
       else
       {
-        adj = ptpClock->currentDS.offsetFromMaster.nanoseconds > 0 ? ADJ_FREQ_MAX : -ADJ_FREQ_MAX;
+        adj = clock->current_ds.offset_from_master.nanoseconds > 0 ? ADJ_FREQ_MAX : -ADJ_FREQ_MAX;
         ptpd_adj_frequency(-adj);
       }
     }
@@ -279,25 +286,25 @@ void updateClock(PtpClock *ptpClock)
     /* normalize offset to 1s sync interval -> response of the servo will
      * be same for all sync interval values, but faster/slower
      * (possible lost of precision/overflow but much more stable) */
-    offsetNorm = ptpClock->currentDS.offsetFromMaster.nanoseconds;
-    if (ptpClock->portDS.logSyncInterval > 0)
-      offsetNorm >>= ptpClock->portDS.logSyncInterval;
-    else if (ptpClock->portDS.logSyncInterval < 0)
-      offsetNorm <<= -ptpClock->portDS.logSyncInterval;
+    offsetNorm = clock->current_ds.offset_from_master.nanoseconds;
+    if (clock->port_ds.log_sync_interval > 0)
+      offsetNorm >>= clock->port_ds.log_sync_interval;
+    else if (clock->port_ds.log_sync_interval < 0)
+      offsetNorm <<= -clock->port_ds.log_sync_interval;
 
     /* the accumulator for the I component */
-    ptpClock->observedDrift += offsetNorm / ptpClock->servo.ai;
+    clock->observed_drift += offsetNorm / clock->servo.ai;
 
     /* clamp the accumulator to ADJ_FREQ_MAX for sanity */
-    if (ptpClock->observedDrift > ADJ_FREQ_MAX)
-      ptpClock->observedDrift = ADJ_FREQ_MAX;
-    else if (ptpClock->observedDrift < -ADJ_FREQ_MAX)
-      ptpClock->observedDrift = -ADJ_FREQ_MAX;
+    if (clock->observed_drift > ADJ_FREQ_MAX)
+      clock->observed_drift = ADJ_FREQ_MAX;
+    else if (clock->observed_drift < -ADJ_FREQ_MAX)
+      clock->observed_drift = -ADJ_FREQ_MAX;
 
     /* apply controller output as a clock tick rate adjustment */
-    if (!ptpClock->servo.noAdjust)
+    if (!clock->servo.no_adjust)
     {
-      adj = offsetNorm / ptpClock->servo.ap + ptpClock->observedDrift;
+      adj = offsetNorm / clock->servo.ap + clock->observed_drift;
       ptpd_adj_frequency(-adj);
     }
 
@@ -306,38 +313,38 @@ void updateClock(PtpClock *ptpClock)
       int a;
       // changed from int type
       int32_t scaledLogVariance;
-      ptpClock->parentDS.parentStats = TRUE;
-      ptpClock->parentDS.observedParentClockPhaseChangeRate = 1100 * ptpClock->observedDrift;
+      clock->parent_ds.parent_stats = TRUE;
+      clock->parent_ds.observed_parent_clock_phase_change_rate = 1100 * clock->observed_drift;
 
-      a = (ptpClock->offsetHistory[1] - 2 * ptpClock->offsetHistory[0] + ptpClock->currentDS.offsetFromMaster.nanoseconds);
-      ptpClock->offsetHistory[1] = ptpClock->offsetHistory[0];
-      ptpClock->offsetHistory[0] = ptpClock->currentDS.offsetFromMaster.nanoseconds;
+      a = (clock->offset_history[1] - 2 * clock->offset_history[0] + clock->current_ds.offset_from_master.nanoseconds);
+      clock->offset_history[1] = clock->offset_history[0];
+      clock->offset_history[0] = clock->current_ds.offset_from_master.nanoseconds;
 
       scaledLogVariance = order(a * a) << 8;
-      filter(&scaledLogVariance, &ptpClock->slv_filt);
-      ptpClock->parentDS.observedParentOffsetScaledLogVariance = 17000 + scaledLogVariance;
-      DBGV("updateClock: observed scalled log variance: 0x%x\n", ptpClock->parentDS.observedParentOffsetScaledLogVariance);
+      filter(&scaledLogVariance, &clock->slv_filt);
+      clock->parent_ds.observed_parent_offset_scaled_log_variance = 17000 + scaledLogVariance;
+      DBGV("servo_update_clock: observed scalled log variance: 0x%x\n",
+           clock->parent_ds.observed_parent_offset_scaled_log_variance);
     }
   }
 
-  switch (ptpClock->portDS.delayMechanism)
+  switch (clock->port_ds.delay_mechanism)
   {
     case E2E:
-    DBG("updateClock: one-way delay averaged (E2E): %d sec %d nsec\n",
-        ptpClock->currentDS.meanPathDelay.seconds, ptpClock->currentDS.meanPathDelay.nanoseconds);
+    DBG("servo_update_clock: one-way delay averaged (E2E): %d sec %d nsec\n",
+          clock->current_ds.mean_path_delay.seconds, clock->current_ds.mean_path_delay.nanoseconds);
       break;
 
     case P2P:
-    DBG("updateClock: one-way delay averaged (P2P): %d sec %d nsec\n",
-        ptpClock->portDS.peerMeanPathDelay.seconds, ptpClock->portDS.peerMeanPathDelay.nanoseconds);
+    DBG("servo_update_clock: one-way delay averaged (P2P): %d sec %d nsec\n",
+          clock->port_ds.peer_mean_path_delay.seconds, clock->port_ds.peer_mean_path_delay.nanoseconds);
       break;
 
     default:
-    DBG("updateClock: one-way delay not computed\n");
+    DBG("servo_update_clock: one-way delay not computed\n");
   }
 
-  DBG("updateClock: offset from master: %d sec %d nsec\n",
-      ptpClock->currentDS.offsetFromMaster.seconds,
-      ptpClock->currentDS.offsetFromMaster.nanoseconds);
-  DBG("updateClock: observed drift: %d\n", ptpClock->observedDrift);
+  DBG("servo_update_clock: offset from master: %d sec %d nsec\n", clock->current_ds.offset_from_master.seconds,
+      clock->current_ds.offset_from_master.nanoseconds);
+  DBG("servo_update_clock: observed drift: %d\n", clock->observed_drift);
 }
