@@ -188,11 +188,11 @@ void ptpdShutdown(ptp_clock_t*);
 /**\{*/
 void displayStats(const ptp_clock_t*ptpClock);
 bool  nanoSleep(const time_interval_t*);
-void bsp_get_time(time_interval_t* time);
-void bsp_set_time(const time_interval_t* time);
+void sys_get_clocktime(time_interval_t* time);
+void sys_set_clocktime(const time_interval_t* time);
 void ptpd_update_time(const time_interval_t* time);
 bool ptpd_adj_frequency(int32_t adj);
-uint32_t bsp_get_rand(uint32_t rand_max);
+uint32_t sys_get_rand(uint32_t rand_max);
 /** \}*/
 
 /** \name timer.c (Linux API dependent)
@@ -350,9 +350,9 @@ ssize_t ptpd_peer_send_general(net_path_t* netPath, const octet_t* buf, int16_t 
 
 ssize_t ptpd_peer_send_event(net_path_t* netPath, const octet_t* buf, int16_t length, time_interval_t* time);
 
-void bsp_get_time(time_interval_t* time);
+void sys_get_clocktime(time_interval_t* time);
 
-void bsp_set_time(const time_interval_t* time);
+void sys_set_clocktime(const time_interval_t* time);
 
 // @todo confirm
 void ptpd_update_time(const time_interval_t* time);

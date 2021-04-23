@@ -349,7 +349,7 @@ ptpd_net_recv(octet_t* buf, time_interval_t* time, ptp_buf_queue_t* msg_queue)
     time->seconds = p->time_sec;
           time->nanoseconds = p->time_nsec;
 #else
-    bsp_get_time(time);
+    sys_get_clocktime(time);
 #endif
   }
 
@@ -421,7 +421,7 @@ ptpd_net_send(const octet_t* buf, int16_t length, time_interval_t* time, const i
     time->seconds = 0;
     time->nanoseconds = 0;
     */
-    bsp_get_time(time);
+    sys_get_clocktime(time);
 #endif
     DBGV("ptpd_net_send: %d sec %d nsec\n", time->seconds, time->nanoseconds);
   }
@@ -493,7 +493,7 @@ ptpd_peer_send_event(net_path_t* net_path, const octet_t* buf, int16_t length, t
 void
 ptpd_update_time(const time_interval_t* time)
 {
-  bsp_set_time(time);
+  sys_set_clocktime(time);
 }
 
 bool

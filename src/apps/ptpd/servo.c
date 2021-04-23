@@ -267,9 +267,9 @@ servo_update_clock(ptp_clock_t* clock)
     {
       if (!clock->servo.no_reset_clock)
       {
-        bsp_get_time(&timeTmp);
+        sys_get_clocktime(&timeTmp);
         ptp_sub_time(&timeTmp, &timeTmp, &clock->current_ds.offset_from_master);
-        bsp_set_time(&timeTmp);
+        sys_set_clocktime(&timeTmp);
         servo_init_clock(clock);
       }
       else

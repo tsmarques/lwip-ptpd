@@ -164,7 +164,7 @@ ptp_to_state(ptp_clock_t* clock, uint8_t state)
           break;
         case P2P:
           ptp_timer_start(PDELAYREQ_INTERVAL_TIMER,
-                          bsp_get_rand(pow2ms(clock->port_ds.log_min_pdelay_req_interval) + 1));
+                          sys_get_rand(pow2ms(clock->port_ds.log_min_pdelay_req_interval) + 1));
           break;
         default:
           break;
@@ -180,7 +180,7 @@ ptp_to_state(ptp_clock_t* clock, uint8_t state)
                       (clock->port_ds.announce_receipt_timeout) * (pow2ms(clock->port_ds.log_announce_interval)));
       if (clock->port_ds.delay_mechanism == P2P)
       {
-        ptp_timer_start(PDELAYREQ_INTERVAL_TIMER, bsp_get_rand(pow2ms(clock->port_ds.log_min_pdelay_req_interval + 1)));
+        ptp_timer_start(PDELAYREQ_INTERVAL_TIMER, sys_get_rand(pow2ms(clock->port_ds.log_min_pdelay_req_interval + 1)));
       }
       clock->port_ds.port_state = PTP_PASSIVE;
 
@@ -193,11 +193,11 @@ ptp_to_state(ptp_clock_t* clock, uint8_t state)
       switch (clock->port_ds.delay_mechanism)
       {
         case E2E:
-          ptp_timer_start(DELAYREQ_INTERVAL_TIMER, bsp_get_rand(pow2ms(clock->port_ds.log_min_delay_req_interval + 1)));
+          ptp_timer_start(DELAYREQ_INTERVAL_TIMER, sys_get_rand(pow2ms(clock->port_ds.log_min_delay_req_interval + 1)));
           break;
         case P2P:
           ptp_timer_start(PDELAYREQ_INTERVAL_TIMER,
-                          bsp_get_rand(pow2ms(clock->port_ds.log_min_pdelay_req_interval + 1)));
+                          sys_get_rand(pow2ms(clock->port_ds.log_min_pdelay_req_interval + 1)));
           break;
         default:
           /* none */
@@ -1262,7 +1262,7 @@ static void issue_delay_req_timer_expired(ptp_clock_t*ptpClock)
       if (ptp_timer_expired(DELAYREQ_INTERVAL_TIMER))
       {
         ptp_timer_start(DELAYREQ_INTERVAL_TIMER,
-                        bsp_get_rand(pow2ms(ptpClock->port_ds.log_min_delay_req_interval + 1)));
+                        sys_get_rand(pow2ms(ptpClock->port_ds.log_min_delay_req_interval + 1)));
         DBGV("event DELAYREQ_INTERVAL_TIMEOUT_EXPIRES\n");
         issue_delay_req(ptpClock);
       }
@@ -1274,7 +1274,7 @@ static void issue_delay_req_timer_expired(ptp_clock_t*ptpClock)
       if (ptp_timer_expired(PDELAYREQ_INTERVAL_TIMER))
       {
         ptp_timer_start(PDELAYREQ_INTERVAL_TIMER,
-                        bsp_get_rand(pow2ms(ptpClock->port_ds.log_min_pdelay_req_interval + 1)));
+                        sys_get_rand(pow2ms(ptpClock->port_ds.log_min_pdelay_req_interval + 1)));
         DBGV("event PDELAYREQ_INTERVAL_TIMEOUT_EXPIRES\n");
         issuePDelayReq(ptpClock);
       }
@@ -1310,7 +1310,7 @@ static void issue_sync(ptp_clock_t*ptpClock)
   time_interval_t internalTime;
 
   /* try to predict outgoing time stamp */
-  bsp_get_time(&internalTime);
+  sys_get_clocktime(&internalTime);
   ptp_time_from_internal(&internalTime, &originTimestamp);
   msg_pack_sync(ptpClock, ptpClock->bfr_msg_out, &originTimestamp);
 
@@ -1364,7 +1364,7 @@ static void issue_delay_req(ptp_clock_t*ptpClock)
   timestamp_t originTimestamp;
   time_interval_t internalTime;
 
-  bsp_get_time(&internalTime);
+  sys_get_clocktime(&internalTime);
   ptp_time_from_internal(&internalTime, &originTimestamp);
 
   msg_pack_delay_req(ptpClock, ptpClock->bfr_msg_out, &originTimestamp);
@@ -1394,7 +1394,7 @@ static void issuePDelayReq(ptp_clock_t*ptpClock)
   timestamp_t originTimestamp;
   time_interval_t internalTime;
 
-  bsp_get_time(&internalTime);
+  sys_get_clocktime(&internalTime);
   ptp_time_from_internal(&internalTime, &originTimestamp);
 
   msg_pack_pdelay_req(ptpClock, ptpClock->bfr_msg_out, &originTimestamp);
