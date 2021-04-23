@@ -27,19 +27,13 @@ bcm_init_data(ptp_clock_t* clock)
   clock->default_ds.two_step_flag = PTPD_DEFAULT_TWO_STEP_FLAG;
 
   /* Init clockIdentity with MAC address and 0xFF and 0xFE. see spec 7.5.2.2.2 */
-  if ((PTPD_CLOCK_IDENTITY_LENGTH == 8) && (PTP_UUID_LENGTH == 6))
-  {
-    DBGVV("bcm_init_data: EUI48toEUI64\n");
+#if (PTPD_CLOCK_IDENTITY_LENGTH == 8) && (PTP_UUID_LENGTH == 6)
     EUI48toEUI64(clock->port_uuid_field, clock->default_ds.clock_identity);
-  }
-  else if (PTPD_CLOCK_IDENTITY_LENGTH == PTP_UUID_LENGTH)
-  {
+#elif (PTPD_CLOCK_IDENTITY_LENGTH == PTP_UUID_LENGTH)
     memcpy(clock->default_ds.clock_identity, clock->port_uuid_field, PTPD_CLOCK_IDENTITY_LENGTH);
-  }
-  else
-  {
+#else
     ERROR("bcm_init_data: UUID length is not valid");
-  }
+#endif
 
   clock->default_ds.number_ports = PTPD_NUMBER_PORTS;
 

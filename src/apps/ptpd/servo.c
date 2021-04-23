@@ -308,24 +308,24 @@ servo_update_clock(ptp_clock_t* clock)
       ptpd_adj_frequency(-adj);
     }
 
-    if (PTPD_DEFAULT_PARENTS_STATS)
-    {
-      int a;
-      // changed from int type
-      int32_t scaledLogVariance;
-      clock->parent_ds.parent_stats = TRUE;
-      clock->parent_ds.observed_parent_clock_phase_change_rate = 1100 * clock->observed_drift;
+#if PTPD_DEFAULT_PARENTS_STATS == 1
+    int a;
+    // changed from int type
+    int32_t scaledLogVariance;
+    clock->parent_ds.parent_stats = TRUE;
+    clock->parent_ds.observed_parent_clock_phase_change_rate = 1100 * clock->observed_drift;
 
-      a = (clock->offset_history[1] - 2 * clock->offset_history[0] + clock->current_ds.offset_from_master.nanoseconds);
-      clock->offset_history[1] = clock->offset_history[0];
-      clock->offset_history[0] = clock->current_ds.offset_from_master.nanoseconds;
+    a = (clock->offset_history[1] - 2 * clock->offset_history[0] + clock->current_ds.offset_from_master.nanoseconds);
+    clock->offset_history[1] = clock->offset_history[0];
+    clock->offset_history[0] = clock->current_ds.offset_from_master.nanoseconds;
 
-      scaledLogVariance = order(a * a) << 8;
-      filter(&scaledLogVariance, &clock->slv_filt);
-      clock->parent_ds.observed_parent_offset_scaled_log_variance = 17000 + scaledLogVariance;
-      DBGV("servo_update_clock: observed scalled log variance: 0x%x\n",
-           clock->parent_ds.observed_parent_offset_scaled_log_variance);
-    }
+    scaledLogVariance = order(a * a) << 8;
+    filter(&scaledLogVariance, &clock->slv_filt);
+    clock->parent_ds.observed_parent_offset_scaled_log_variance = 17000 + scaledLogVariance;
+    DBGV("servo_update_clock: observed scalled log variance: 0x%x\n",
+         clock->parent_ds.observed_parent_offset_scaled_log_variance);
+#endif
+
   }
 
   switch (clock->port_ds.delay_mechanism)
