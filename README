@@ -1,3 +1,12 @@
+LWIP-PTP NOTES
+
+This implementation is a port from Linux's implementation of the protocol.
+It is based on https://github.com/mpthompson/stm32_f4_ptpd. I don't guarantee
+that the implementation is bug free nor that it works for all the purposes PTP
+was created. I've only tested this for my use cases which were mostly simple
+master/slave scenarios.
+
+
 INTRODUCTION
 
 lwIP is a small independent implementation of the TCP/IP protocol suite.
